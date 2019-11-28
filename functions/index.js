@@ -5,36 +5,46 @@ const firebase = require('firebase');
 
 const app = express();
 
-const { db, admin } = require('./util/admin');
-
-const { isEmpty, isEmail } = require('./util/validators');
-
-const { getAllPosts, postOnePost } = require('./handlers/posts');
-
 const { FBAuth } = require('./util/fbAuth');
 
+const { getAllPosts, postOnePost } = require('./handlers/posts');
 const { signup, login } = require('./handlers/users');
 
-// const config = {
-//     apiKey: "AIzaSyDP0myBhtZwi1wJOI2lAxygWaCvmZxH0OA",
-//     authDomain: "my-tcc-project-66a43.firebaseapp.com",
-//     databaseURL: "https://my-tcc-project-66a43.firebaseio.com",
-//     projectId: "my-tcc-project-66a43",
-//     storageBucket: "my-tcc-project-66a43.appspot.com",
-//     messagingSenderId: "325772360716",
-//     appId: "1:325772360716:web:82b03d8a034a91cfdc0229",
-//     measurementId: "G-JHZDV9PBLW"
-// };
-
-// firebase.initializeApp(config);
+const { db } = require('./util/admin');
 
 //Post routes
+app.post('/dialogflowFulfillment', (req, res) => {
+    const { WebhookClient } = require('dialogflow-fulfillment');
+    const agent = new WebhookClient({ request: req, response: res });
 
+    function writeToDb(agent) {
+        const databaseEntry = agent.parameters.databaseEntry;
+
+        let newPost = {
+            userHandle: 'User',
+            createdAt: new Date().toISOString(),
+            body: databaseEntry
+        };
+
+        return db.collection("posts").add(newPost)
+            .then(doc => {
+                agent.add(`Wrote "${databaseEntry}" to the databse`);
+                console.log(`document ${doc.id} created successfuly`);
+            })
+            .catch(err => {
+                res.status(500).json({ error: 'something went wrong' });
+                console.error(err);
+            });
+    }
+    let intentMap = new Map();
+    intentMap.set('WriteToDatabase', writeToDb);
+    agent.handleRequest(intentMap);
+})
 app.get('/posts', getAllPosts);
 
 app.post('/post', FBAuth, postOnePost);
 
-// CMK
+//Users routes
 
 app.post('/signup', signup);
 
